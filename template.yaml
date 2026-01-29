@@ -1,0 +1,272 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  SQS-based messaging solution - REST API Gateway to SQS with Lambda for email and SMS
+
+Parameters:
+  JWTSecret:
+    Type: String
+    Description: "IMPORTANT: Set a strong, random secret for JWT token validation (32+ characters recommended)"
+    Default: change-this-secret-key-in-production-REPLACE-ME
+    NoEcho: true
+    MinLength: 16
+
+Resources:
+##########################################################################
+#   SECRETS MANAGER                                                      #
+##########################################################################
+  JWTSecretParameter:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub ${AWS::StackName}-jwt-secret
+      Description: JWT secret key for API authentication
+      SecretString: !Ref JWTSecret
+
+##########################################################################
+#   SQS QUEUES                                                           #
+##########################################################################
+  MessagesQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: MessagesQueue
+      VisibilityTimeout: 300
+      MessageRetentionPeriod: 345600
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt MessagesDeadLetterQueue.Arn
+        maxReceiveCount: 3
+
+  MessagesDeadLetterQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: MessagesDeadLetterQueue
+      MessageRetentionPeriod: 1209600
+      
+##########################################################################
+#   DynamoDB Table for Message Templates                                #
+##########################################################################
+  MessageTemplatesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: MessageTemplates
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: TemplateName
+          AttributeType: S
+      KeySchema:
+        - AttributeName: TemplateName
+          KeyType: HASH
+      Tags:
+        - Key: Purpose
+          Value: Message Template Storage
+
+##########################################################################
+#   API GATEWAY ROLE WITH PERMISSIONS TO SEND TO SQS                    #
+##########################################################################
+  ApiGatewaySQSRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: !Join ["", ["/", !Ref "AWS::StackName", "/"]]
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: AllowApiGatewayServiceToAssumeRole
+            Effect: Allow
+            Action:
+              - 'sts:AssumeRole'
+            Principal:
+              Service:
+                - apigateway.amazonaws.com
+      Policies:
+        - PolicyName: SQSSendMessage
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'sqs:SendMessage'
+                Resource:
+                  - !GetAtt MessagesQueue.Arn
+  
+##########################################################################
+#   REST API GATEWAY                                                     #
+##########################################################################
+  apiGateway:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+      Name: !Sub ${AWS::StackName}-api
+
+  ApiGatewayAuthorizer:
+    Type: AWS::ApiGateway::Authorizer
+    Properties:
+      Name: JWTAuthorizer
+      Type: TOKEN
+      AuthorizerUri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthorizerFunction.Arn}/invocations
+      AuthorizerResultTtlInSeconds: 300
+      IdentitySource: method.request.header.Authorization
+      RestApiId: !Ref apiGateway
+
+  AuthorizerInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AuthorizerFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${apiGateway}/authorizers/${ApiGatewayAuthorizer}
+
+##########################################################################
+#   API GATEWAY METHOD                                                   #
+##########################################################################
+  apiGatewayRootMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: CUSTOM
+      AuthorizerId: !Ref ApiGatewayAuthorizer
+      HttpMethod: POST
+      MethodResponses:
+        - StatusCode: 200
+          ResponseModels:
+            application/json: Empty
+      Integration:
+        IntegrationHttpMethod: POST
+        Type: AWS
+        Credentials: !GetAtt ApiGatewaySQSRole.Arn 
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:sqs:path/${AWS::AccountId}/${MessagesQueue.QueueName}
+        PassthroughBehavior: NEVER
+        RequestParameters:
+          integration.request.header.Content-Type: "'application/x-www-form-urlencoded'"
+        RequestTemplates: 
+          application/json: |
+            Action=SendMessage&MessageBody=$util.urlEncode($input.body)
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseTemplates: 
+              application/json: |
+                {
+                  "status": "Message sent to queue"
+                }
+      ResourceId: !GetAtt apiGateway.RootResourceId
+      RestApiId: !Ref apiGateway
+
+##########################################################################
+#   API GATEWAY DEPLOYMENT                                               #
+##########################################################################
+  apiGatewayDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - apiGatewayRootMethod
+    Properties:
+      RestApiId: !Ref apiGateway
+      StageName: 'dev'
+
+##########################################################################
+#   LAMBDA FUNCTIONS                                                     #
+##########################################################################
+  AuthorizerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: JWTAuthorizer
+      CodeUri: lambda/
+      Handler: authorizer.lambda_handler
+      Runtime: python3.12
+      Timeout: 10
+      Environment:
+        Variables:
+          JWT_SECRET_ARN: !Ref JWTSecretParameter
+          JWT_ALGORITHM: HS256
+          JWT_ISSUER: messaging-api
+          JWKS_URL: ""
+      Policies:
+        - Statement:
+          - Effect: Allow
+            Action:
+              - secretsmanager:GetSecretValue
+            Resource: !Ref JWTSecretParameter
+
+  MessageProcessorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: MessageProcessor
+      CodeUri: lambda/
+      Handler: message_processor.lambda_handler
+      Runtime: python3.12
+      Timeout: 300
+      Environment:
+        Variables:
+          TEMPLATES_TABLE_NAME: !Ref MessageTemplatesTable
+      Policies:
+        - SESCrudPolicy:
+            IdentityName: "*"
+        - Statement:
+          - Effect: Allow
+            Action:
+              - sms-voice:SendTextMessage
+            Resource: "*"
+        - DynamoDBReadPolicy:
+            TableName: !Ref MessageTemplatesTable
+      Events:
+        SQSEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt MessagesQueue.Arn
+            BatchSize: 10
+            MaximumBatchingWindowInSeconds: 5
+            FunctionResponseTypes:
+              - ReportBatchItemFailures
+
+##########################################################################
+#   DLQ MONITORING                                                       #
+##########################################################################
+  DLQAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub ${AWS::StackName}-DLQ-Messages
+      AlarmDescription: Alert when messages arrive in DLQ
+      MetricName: ApproximateNumberOfMessagesVisible
+      Namespace: AWS/SQS
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt MessagesDeadLetterQueue.QueueName
+
+##########################################################################
+#   OUTPUTS                                                              #
+##########################################################################
+Outputs:
+  ApiEndpoint: 
+    Description: "API Gateway endpoint URL for Dev stage"
+    Value: !Sub "https://${apiGateway}.execute-api.${AWS::Region}.${AWS::URLSuffix}/dev/"
+  
+  JWTSecretArn:
+    Description: "ARN of the JWT secret in Secrets Manager"
+    Value: !Ref JWTSecretParameter
+  
+  AuthorizerFunction:
+    Description: "JWT Authorizer Lambda Function ARN"
+    Value: !GetAtt AuthorizerFunction.Arn
+  
+  MessagesQueueUrl:
+    Description: "SQS Queue URL"
+    Value: !Ref MessagesQueue
+    
+  MessagesQueueArn:
+    Description: "SQS Queue ARN"
+    Value: !GetAtt MessagesQueue.Arn
+    
+  DeadLetterQueueUrl:
+    Description: "Dead Letter Queue URL"
+    Value: !Ref MessagesDeadLetterQueue
+    
+  MessageProcessorFunction:
+    Description: "Message Processor Lambda Function ARN"
+    Value: !GetAtt MessageProcessorFunction.Arn
+    
+  MessageTemplatesTableName:
+    Description: "DynamoDB table name for message templates"
+    Value: !Ref MessageTemplatesTable
