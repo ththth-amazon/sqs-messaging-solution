@@ -190,7 +190,7 @@ Special thanks to:
 
 ### Getting Help
 
-- **Documentation**: Check the [deployment guide](CUSTOMER_DEPLOYMENT_GUIDE.md)
+- **Documentation**: Check the [deployment guide](DEPLOYMENT-GUIDE.md)
 - **Issues**: Open an [issue](https://github.com/YOUR_USERNAME/sqs-messaging-solution/issues)
 - **Discussions**: Join [GitHub Discussions](https://github.com/YOUR_USERNAME/sqs-messaging-solution/discussions)
 

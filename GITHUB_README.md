@@ -116,7 +116,7 @@ curl -X POST "YOUR_API_ENDPOINT" \
 
 ## 📖 Deployment
 
-For detailed deployment instructions, see [CUSTOMER_DEPLOYMENT_GUIDE.md](CUSTOMER_DEPLOYMENT_GUIDE.md).
+For detailed deployment instructions, see [DEPLOYMENT-GUIDE.md](DEPLOYMENT-GUIDE.md).
 
 ### Configuration Parameters
 
@@ -369,7 +369,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📚 Additional Resources
 
-- [Complete Deployment Guide](CUSTOMER_DEPLOYMENT_GUIDE.md)
+- [Complete Deployment Guide](DEPLOYMENT-GUIDE.md)
 - [Authentication Guide](customer-package/AUTHENTICATION.md)
 - [API Documentation](customer-package/README.md)
 - [AWS Blog Post](aws-blog-post.md)
@@ -392,7 +392,7 @@ Built with AWS serverless services following the [AWS Well-Architected Framework
 For questions or support:
 - Open an [issue](https://github.com/YOUR_USERNAME/sqs-messaging-solution/issues)
 - Check the [documentation](customer-package/README.md)
-- Review [troubleshooting guide](CUSTOMER_DEPLOYMENT_GUIDE.md#monitoring-and-troubleshooting)
+- Review [troubleshooting guide](DEPLOYMENT-GUIDE.md#monitoring-and-troubleshooting)
 
 ---
 

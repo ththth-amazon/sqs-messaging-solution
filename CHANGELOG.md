@@ -147,4 +147,4 @@ This is the first production-ready release of the SQS-Based Multi-Channel Messag
 For questions about releases:
 - Check the [documentation](customer-package/README.md)
 - Open an [issue](https://github.com/YOUR_USERNAME/sqs-messaging-solution/issues)
-- Review the [deployment guide](CUSTOMER_DEPLOYMENT_GUIDE.md)
+- Review the [deployment guide](DEPLOYMENT-GUIDE.md)
