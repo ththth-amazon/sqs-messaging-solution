@@ -8,6 +8,7 @@ sms_client = boto3.client('pinpoint-sms-voice-v2')
 dynamodb = boto3.resource('dynamodb')
 
 TEMPLATES_TABLE_NAME = os.environ.get('TEMPLATES_TABLE_NAME', 'MessageTemplates')
+SES_CONFIGURATION_SET = os.environ.get('SES_CONFIGURATION_SET', '')
 templates_table = dynamodb.Table(TEMPLATES_TABLE_NAME)
 
 def lambda_handler(event, context):
@@ -72,17 +73,24 @@ def send_emails(message):
                     subject = email_config.get('Subject', 'Account Alert')
                     body_html = build_email_body(merged_subs)
                 
-                response = ses_client.send_email(
-                    FromEmailAddress=from_address,
-                    Destination={'ToAddresses': [address]},
-                    ReplyToAddresses=reply_to,
-                    Content={
+                # Build email parameters
+                email_params = {
+                    'FromEmailAddress': from_address,
+                    'Destination': {'ToAddresses': [address]},
+                    'ReplyToAddresses': reply_to,
+                    'Content': {
                         'Simple': {
                             'Subject': {'Data': subject},
                             'Body': {'Html': {'Data': body_html}}
                         }
                     }
-                )
+                }
+                
+                # Add configuration set if specified
+                if SES_CONFIGURATION_SET:
+                    email_params['ConfigurationSetName'] = SES_CONFIGURATION_SET
+                
+                response = ses_client.send_email(**email_params)
                 print(f"Email sent to {address}: {response['MessageId']}")
                 
             except ClientError as e:
