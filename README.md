@@ -43,6 +43,7 @@ Follow the prompts to configure:
 - Stack name
 - AWS Region
 - **JWT Secret** (important: use a strong, random secret for production)
+  - **Note:** Must be at least 16 characters long
 
 The deployment will create:
 - API Gateway with JWT authorizer

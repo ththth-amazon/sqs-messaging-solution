@@ -25,7 +25,7 @@ def generate_token(user_id, email=None, customer_id=None, expires_in_hours=24):
     Returns:
         JWT token string
     """
-    now = datetime.datetime.utcnow()
+    now = datetime.datetime.now(datetime.UTC)
     expiration = now + datetime.timedelta(hours=expires_in_hours)
     
     payload = {

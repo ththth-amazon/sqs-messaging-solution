@@ -10,6 +10,11 @@ Parameters:
     Default: change-this-secret-key-in-production-REPLACE-ME
     NoEcho: true
     MinLength: 16
+  
+  SESConfigurationSet:
+    Type: String
+    Description: "Optional: SES Configuration Set name for email tracking and analytics"
+    Default: ""
 
 Resources:
 ##########################################################################
@@ -196,9 +201,17 @@ Resources:
       Environment:
         Variables:
           TEMPLATES_TABLE_NAME: !Ref MessageTemplatesTable
+          SES_CONFIGURATION_SET: !Ref SESConfigurationSet
       Policies:
         - SESCrudPolicy:
             IdentityName: "*"
+        - Statement:
+          - Effect: Allow
+            Action:
+              - ses:SendEmail
+              - ses:SendRawEmail
+            Resource: 
+              - "*"
         - Statement:
           - Effect: Allow
             Action:
