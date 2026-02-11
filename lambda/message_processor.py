@@ -9,6 +9,7 @@ dynamodb = boto3.resource('dynamodb')
 
 TEMPLATES_TABLE_NAME = os.environ.get('TEMPLATES_TABLE_NAME', 'MessageTemplates')
 SES_CONFIGURATION_SET = os.environ.get('SES_CONFIGURATION_SET', '')
+SMS_CONFIGURATION_SET = os.environ.get('SMS_CONFIGURATION_SET', '')
 templates_table = dynamodb.Table(TEMPLATES_TABLE_NAME)
 
 def lambda_handler(event, context):
@@ -129,12 +130,19 @@ def send_sms_messages(message):
                     # Option 3: Use default hardcoded template
                     message_body = build_sms_body(substitutions)
                 
-                response = sms_client.send_text_message(
-                    DestinationPhoneNumber=clean_address,
-                    OriginationIdentity=origination_number,
-                    MessageBody=message_body,
-                    MessageType=message_type
-                )
+                # Build SMS parameters
+                sms_params = {
+                    'DestinationPhoneNumber': clean_address,
+                    'OriginationIdentity': origination_number,
+                    'MessageBody': message_body,
+                    'MessageType': message_type
+                }
+                
+                # Add configuration set if specified
+                if SMS_CONFIGURATION_SET:
+                    sms_params['ConfigurationSetName'] = SMS_CONFIGURATION_SET
+                
+                response = sms_client.send_text_message(**sms_params)
                 print(f"SMS sent to {clean_address}: {response['MessageId']}")
                 
             except ClientError as e:

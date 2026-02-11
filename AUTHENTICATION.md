@@ -70,8 +70,9 @@ Every API request must include a valid JWT token in the `Authorization` header. 
 
 2. **Lambda Authorizer**
    - Validates JWT tokens
-   - Retrieves secret from Secrets Manager
+   - Retrieves secret from Secrets Manager (cached in Lambda memory)
    - Returns Allow/Deny policy to API Gateway
+   - **Security Note:** Secret caching is an AWS-recommended best practice - Lambda containers are isolated and ephemeral, making memory caching secure while avoiding API costs and latency
 
 3. **AWS Secrets Manager**
    - Stores JWT secret securely
@@ -97,7 +98,16 @@ arn:aws:secretsmanager:us-west-2:912774817710:secret:smsEmailTemplateSolution-jw
 **Access:**
 - Only Lambda Authorizer has permission to read
 - Encrypted at rest with AWS KMS
+- Cached in Lambda memory for performance (secure due to container isolation)
 - Audit trail in CloudWatch Logs
+
+**Why Caching is Secure:**
+The JWT secret is cached in Lambda container memory to avoid repeated Secrets Manager API calls. This is secure because:
+- Lambda containers are isolated from each other
+- Containers are ephemeral (destroyed after inactivity)
+- Secrets never persist to disk, only in memory
+- Avoids $0.05 per 10,000 API calls and 100-200ms latency per request
+- AWS-recommended best practice for Lambda + Secrets Manager
 
 **Rotation:**
 ```bash
@@ -107,7 +117,8 @@ aws secretsmanager update-secret \
   --secret-string "new-secret-key-here" \
   --region us-west-2
 
-# Lambda automatically picks up new secret on next cold start
+# Lambda containers automatically pick up new secret as they recycle
+# Or force immediate update by deploying a new function version
 ```
 
 ### Client Side (API Consumer)

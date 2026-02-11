@@ -19,7 +19,7 @@ API Gateway (JWT Auth) → SQS Queue → Lambda → SES/SMS
 - **Visibility Timeout**: 5 minutes (prevents duplicate processing)
 - **Dead Letter Queue**: Preserves failed messages for 14 days
 - **Partial Batch Failures**: Only failed messages retry
-- **CloudWatch Alarm**: Alerts when DLQ receives messages
+- **CloudWatch Alarm**: Monitors DLQ (requires SNS configuration to receive notifications)
 - **Template Management**: Store SMS/email templates in DynamoDB
 - **Secrets Manager**: JWT secret stored securely in AWS Secrets Manager
 
@@ -44,6 +44,8 @@ Follow the prompts to configure:
 - AWS Region
 - **JWT Secret** (important: use a strong, random secret for production)
   - **Note:** Must be at least 16 characters long
+- **SES Configuration Set** (optional: for email tracking and analytics)
+- **SMS Configuration Set** (optional: for SMS tracking and analytics)
 
 The deployment will create:
 - API Gateway with JWT authorizer
@@ -51,7 +53,7 @@ The deployment will create:
 - Lambda functions (authorizer and message processor)
 - DynamoDB table for templates
 - Secrets Manager secret for JWT
-- CloudWatch alarm for DLQ
+- CloudWatch alarm for DLQ (requires SNS configuration for notifications)
 
 ## Authentication
 
@@ -271,6 +273,35 @@ aws sqs receive-message \
 ```
 
 ## Configuration
+
+### Configuration Sets (Optional)
+
+Configuration sets enable tracking and analytics for email and SMS messages.
+
+**Email Configuration Sets (SES):**
+- Track email delivery, opens, clicks, bounces, and complaints
+- Send events to CloudWatch, Kinesis, or SNS
+- Monitor email reputation and engagement
+
+**SMS Configuration Sets (End User Messaging):**
+- Track SMS delivery and failure events
+- Monitor SMS sending patterns
+- Analyze message costs by destination
+
+**To use configuration sets:**
+
+1. Create a configuration set in AWS Console:
+   - For Email: SES Console > Configuration Sets
+   - For SMS: End User Messaging SMS Console > Configuration Sets
+
+2. Deploy/update your stack with configuration set names:
+   ```bash
+   sam deploy --parameter-overrides \
+     SESConfigurationSet=my-email-config-set \
+     SMSConfigurationSet=my-sms-config-set
+   ```
+
+3. Messages will automatically use the configured sets for tracking
 
 ### Adjust Retry Count
 

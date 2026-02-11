@@ -15,6 +15,11 @@ Parameters:
     Type: String
     Description: "Optional: SES Configuration Set name for email tracking and analytics"
     Default: ""
+  
+  SMSConfigurationSet:
+    Type: String
+    Description: "Optional: SMS Configuration Set name for SMS tracking and analytics"
+    Default: ""
 
 Resources:
 ##########################################################################
@@ -202,6 +207,7 @@ Resources:
         Variables:
           TEMPLATES_TABLE_NAME: !Ref MessageTemplatesTable
           SES_CONFIGURATION_SET: !Ref SESConfigurationSet
+          SMS_CONFIGURATION_SET: !Ref SMSConfigurationSet
       Policies:
         - SESCrudPolicy:
             IdentityName: "*"

@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Optional SES Configuration Set parameter for email tracking and analytics
 - Environment variable `SES_CONFIGURATION_SET` to configure SES configuration set at deployment time
+- Optional SMS Configuration Set parameter for SMS tracking and analytics
+- Environment variable `SMS_CONFIGURATION_SET` to configure SMS configuration set at deployment time
 
 ### Fixed
 - Fixed deprecation warning in `generate_jwt.py` by replacing `datetime.datetime.utcnow()` with `datetime.datetime.now(datetime.UTC)` for timezone-aware datetime objects
